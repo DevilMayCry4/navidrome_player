@@ -166,9 +166,17 @@ watch(volume, (vol) => {
 /**
  * 监听歌曲变化
  */
-watch(currentSong, () => {
-  if (audioRef.value && currentSong.value) {
+watch(currentSong, (newSong, oldSong) => {
+  if (audioRef.value && newSong) {
     audioRef.value.load()
+    // 如果是新歌曲且当前状态为播放，则在加载完成后自动播放
+    if (newSong.id !== oldSong?.id && isPlaying.value) {
+      const playWhenReady = () => {
+        audioRef.value?.play().catch(console.error)
+        audioRef.value?.removeEventListener('canplay', playWhenReady)
+      }
+      audioRef.value.addEventListener('canplay', playWhenReady)
+    }
   }
 })
 
@@ -238,6 +246,10 @@ const handleLoadedMetadata = () => {
   if (audioRef.value) {
     musicStore.setDuration(audioRef.value.duration)
     audioRef.value.volume = volume.value
+    // 如果当前状态为播放，则开始播放
+    if (isPlaying.value) {
+      audioRef.value.play().catch(console.error)
+    }
   }
 }
 
