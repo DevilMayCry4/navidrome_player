@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance } from 'axios'
 import CryptoJS from 'crypto-js'
-import type { AuthInfo, Album, Song, Artist, Playlist, SubsonicResponse } from '@/types'
+import type { AuthInfo, Album, Song, Artist, SubsonicResponse } from '@/types'
 
 /**
  * Subsonic API 客户端类
@@ -196,6 +196,45 @@ export class SubsonicClient {
       return ''
     }
     return this.buildUrl('getCoverArt.view', { id: coverArtId, size })
+  }
+
+  /**
+   * 分页获取歌曲列表
+   * @param page - 页码（从1开始）
+   * @param size - 每页数量，默认10条
+   * @returns 歌曲列表和分页信息
+   */
+  async getSongs(page = 1, size = 10): Promise<{ songs: Song[]; total: number; hasMore: boolean }> {
+    try {
+      const offset = (page - 1) * size
+      const url = this.buildUrl('search3.view', { 
+        query: '', // 使用通配符获取所有歌曲
+        songCount: size,
+        songOffset: offset,
+        artistCount: 0,
+        albumCount: 0
+      })
+      
+      const response = await this.api.get(url)
+      const searchResult = response.data['subsonic-response'].searchResult3 || {}
+      const songs = searchResult.song || []
+      
+      // 由于Subsonic API没有直接返回总数，我们通过检查返回的歌曲数量来判断是否还有更多
+      const hasMore = songs.length === size
+      
+      return {
+        songs,
+        total: -1, // Subsonic API不提供总数
+        hasMore
+      }
+    } catch (error) {
+      console.error('获取歌曲列表失败:', error)
+      return {
+        songs: [],
+        total: 0,
+        hasMore: false
+      }
+    }
   }
 
   /**

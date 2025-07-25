@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Song, Album, Artist } from '@/types'
+import type { Song } from '@/types'
 import { subsonicClient } from '@/services/subsonic'
 
 /**
@@ -23,6 +23,16 @@ export const useMusicStore = defineStore('music', () => {
   const currentTime = ref(0)
   // 歌曲总时长
   const duration = ref(0)
+  // 所有歌曲列表
+  const allSongs = ref<Song[]>([])
+  // 当前页码
+  const currentPage = ref(1)
+  // 每页数量
+  const pageSize = ref(10)
+  // 是否还有更多歌曲
+  const hasMoreSongs = ref(true)
+  // 加载状态
+  const isLoadingSongs = ref(false)
 
   // 计算属性
   const hasNext = computed(() => {
@@ -153,6 +163,53 @@ export const useMusicStore = defineStore('music', () => {
     currentTime.value = time
   }
 
+  /**
+   * 获取歌曲列表（分页）
+   * @param page - 页码，默认为当前页
+   * @param reset - 是否重置列表
+   */
+  const fetchSongs = async (page?: number, reset = false) => {
+    if (isLoadingSongs.value) return
+    
+    const targetPage = page || currentPage.value
+    isLoadingSongs.value = true
+    
+    try {
+      const result = await subsonicClient.getSongs(targetPage, pageSize.value)
+      
+      if (reset || targetPage === 1) {
+        allSongs.value = result.songs
+      } else {
+        allSongs.value.push(...result.songs)
+      }
+      
+      currentPage.value = targetPage
+      hasMoreSongs.value = result.hasMore
+    } catch (error) {
+      console.error('获取歌曲列表失败:', error)
+    } finally {
+      isLoadingSongs.value = false
+    }
+  }
+
+  /**
+   * 加载下一页歌曲
+   */
+  const loadMoreSongs = async () => {
+    if (hasMoreSongs.value && !isLoadingSongs.value) {
+      await fetchSongs(currentPage.value + 1)
+    }
+  }
+
+  /**
+   * 刷新歌曲列表
+   */
+  const refreshSongs = async () => {
+    currentPage.value = 1
+    hasMoreSongs.value = true
+    await fetchSongs(1, true)
+  }
+
   return {
     // 状态
     currentSong,
@@ -163,6 +220,11 @@ export const useMusicStore = defineStore('music', () => {
     playMode,
     currentTime,
     duration,
+    allSongs,
+    currentPage,
+    pageSize,
+    hasMoreSongs,
+    isLoadingSongs,
     
     // 计算属性
     hasNext,
@@ -178,5 +240,8 @@ export const useMusicStore = defineStore('music', () => {
     updateCurrentTime,
     setDuration,
     seekTo,
+    fetchSongs,
+    loadMoreSongs,
+    refreshSongs,
   }
 })

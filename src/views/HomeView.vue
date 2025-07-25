@@ -156,47 +156,20 @@
         </div>
       </div>
 
-      <!-- 专辑展示区 -->
-      <div class="album-section" v-if="currentAlbum">
-        <div class="album-info">
-          <div class="album-cover">
-            <img
-              :src="currentAlbum.coverArt ? getCoverUrl(currentAlbum.coverArt) : defaultCover"
-              :alt="currentAlbum.name"
-            />
-          </div>
-          <div class="album-details">
-            <div class="album-meta">
-              <span class="album-type">专辑</span>
-              <span class="album-artist">{{ currentAlbum.artist }}</span>
-            </div>
-            <h1 class="album-title">{{ currentAlbum.name }}</h1>
-            <div class="album-stats">
-              <span>{{ currentAlbum.year }}年发布</span>
-              <span>{{ currentAlbum.songCount }}首歌曲，{{ formatDuration(currentAlbum.duration) }}</span>
-            </div>
-            <div class="album-actions">
-              <a-button type="primary" size="large" @click="playAlbum">
-                <PlayCircleOutlined />
-                播放全部
-              </a-button>
-              <a-button size="large">
-                <HeartOutlined />
-                收藏
-              </a-button>
-              <a-button size="large">
-                <ShareAltOutlined />
-                分享
-              </a-button>
-              <a-button size="large">
-                <DownloadOutlined />
-                下载
-              </a-button>
-              <a-button size="large">
-                <PlusOutlined />
-                添加
-              </a-button>
-            </div>
+      <!-- 音乐库标题区 -->
+      <div class="music-library-section">
+        <div class="library-header">
+          <h1 class="library-title">我的音乐库</h1>
+          <p class="library-subtitle">发现和播放你喜爱的音乐</p>
+          <div class="library-actions">
+            <a-button type="primary" size="large" @click="playAllSongs" :disabled="allSongs.length === 0">
+              <PlayCircleOutlined />
+              播放全部
+            </a-button>
+            <a-button size="large" @click="refreshSongs" :loading="isLoadingSongs">
+              <ReloadOutlined />
+              刷新
+            </a-button>
           </div>
         </div>
       </div>
@@ -204,11 +177,13 @@
       <!-- 歌曲列表 -->
       <div class="song-list-section">
         <div class="section-header">
-          <h3>歌曲列表</h3>
-          <a-button type="text">
-            <UnorderedListOutlined />
-            排序
-          </a-button>
+          <h3>歌曲列表 ({{ allSongs.length }} 首)</h3>
+          <div class="section-actions">
+            <a-button type="text">
+              <UnorderedListOutlined />
+              排序
+            </a-button>
+          </div>
         </div>
 
         <div class="song-list">
@@ -216,12 +191,13 @@
             <div class="song-number">#</div>
             <div class="song-title">歌曲</div>
             <div class="song-artist">歌手</div>
+            <div class="song-album">专辑</div>
             <div class="song-duration">时长</div>
             <div class="song-actions"></div>
           </div>
 
           <div
-            v-for="(song, index) in songList"
+            v-for="(song, index) in allSongs"
             :key="song.id"
             class="song-item"
             :class="{ active: currentSong?.id === song.id }"
@@ -232,9 +208,13 @@
               <SoundOutlined v-else class="playing-icon" />
             </div>
             <div class="song-title">
-              <span>{{ song.title }}</span>
+              <div class="song-info">
+                <span class="song-name">{{ song.title }}</span>
+                <span v-if="song.genre" class="song-genre">{{ song.genre }}</span>
+              </div>
             </div>
             <div class="song-artist">{{ song.artist }}</div>
+            <div class="song-album">{{ song.album }}</div>
             <div class="song-duration">{{ formatDuration(song.duration) }}</div>
             <div class="song-actions">
               <a-button type="text" size="small">
@@ -242,6 +222,35 @@
               </a-button>
             </div>
           </div>
+        </div>
+
+        <!-- 加载更多按钮 -->
+        <div class="load-more-section" v-if="hasMoreSongs || isLoadingSongs">
+          <a-button 
+            type="primary" 
+            size="large" 
+            :loading="isLoadingSongs"
+            @click="loadMoreSongs"
+            :disabled="!hasMoreSongs"
+          >
+            <template v-if="!isLoadingSongs">
+              <DownOutlined />
+              加载更多歌曲
+            </template>
+            <template v-else>
+              加载中...
+            </template>
+          </a-button>
+        </div>
+
+        <!-- 空状态 -->
+        <div class="empty-state" v-if="allSongs.length === 0 && !isLoadingSongs">
+          <a-empty description="暂无歌曲">
+            <a-button type="primary" @click="refreshSongs">
+              <ReloadOutlined />
+              重新加载
+            </a-button>
+          </a-empty>
         </div>
       </div>
     </div>
@@ -270,14 +279,13 @@ import {
   DownOutlined,
   LogoutOutlined,
   PlayCircleOutlined,
-  ShareAltOutlined,
-  PlusOutlined,
   UnorderedListOutlined,
   SoundOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons-vue'
 import { subsonicClient } from '@/services/subsonic'
 import { useMusicStore } from '@/stores/music'
-import type { Album, Song } from '@/types'
+import type { Song } from '@/types'
 
 const router = useRouter()
 const musicStore = useMusicStore()
@@ -285,13 +293,13 @@ const musicStore = useMusicStore()
 // 响应式数据
 const selectedKeys = ref(['discover'])
 const searchQuery = ref('')
-const currentAlbum = ref<Album | null>(null)
-const songList = ref<Song[]>([])
 const username = ref('')
-const defaultCover = '/favicon.ico' // 默认封面
 
 // 计算属性
 const currentSong = computed(() => musicStore.currentSong)
+const allSongs = computed(() => musicStore.allSongs)
+const isLoadingSongs = computed(() => musicStore.isLoadingSongs)
+const hasMoreSongs = computed(() => musicStore.hasMoreSongs)
 
 /**
  * 组件挂载时初始化
@@ -311,25 +319,22 @@ onMounted(async () => {
     username.value = userInfo.username
   }
 
-  // 加载专辑数据
-  await loadAlbumData()
+  // 加载歌曲数据
+  await musicStore.fetchSongs(1, true)
 })
 
 /**
- * 加载专辑数据
+ * 刷新歌曲列表
  */
-const loadAlbumData = async () => {
-  try {
-    const albums = await subsonicClient.getAlbumList('newest', 1)
-    if (albums.length > 0) {
-      const albumData = await subsonicClient.getAlbum(albums[0].id)
-      currentAlbum.value = albumData.album
-      songList.value = albumData.songs
-    }
-  } catch (error) {
-    console.error('加载专辑数据失败:', error)
-    message.error('加载数据失败')
-  }
+const refreshSongs = async () => {
+  await musicStore.refreshSongs()
+}
+
+/**
+ * 加载更多歌曲
+ */
+const loadMoreSongs = async () => {
+  await musicStore.loadMoreSongs()
 }
 
 /**
@@ -337,15 +342,15 @@ const loadAlbumData = async () => {
  * @param song - 要播放的歌曲
  */
 const playSong = (song: Song) => {
-  musicStore.playSong(song, songList.value)
+  musicStore.playSong(song, allSongs.value)
 }
 
 /**
- * 播放整个专辑
+ * 播放所有歌曲
  */
-const playAlbum = () => {
-  if (songList.value.length > 0) {
-    musicStore.playSong(songList.value[0], songList.value)
+const playAllSongs = () => {
+  if (allSongs.value.length > 0) {
+    musicStore.playSong(allSongs.value[0], allSongs.value)
   }
 }
 
@@ -360,14 +365,7 @@ const formatDuration = (seconds: number): string => {
   return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
 }
 
-/**
- * 获取封面图片URL
- * @param coverArtId - 封面艺术ID
- * @returns 图片URL
- */
-const getCoverUrl = (coverArtId: string): string => {
-  return subsonicClient.getCoverArtUrl(coverArtId)
-}
+
 
 /**
  * 处理搜索
@@ -469,74 +467,34 @@ const handleLogout = () => {
   border-bottom: 1px solid #e8e8e8;
 }
 
-/* 专辑展示区样式 */
-.album-section {
+/* 音乐库标题区样式 */
+.music-library-section {
   padding: 32px 24px;
-  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 
-.album-info {
-  display: flex;
-  gap: 24px;
+.library-header {
+  text-align: center;
 }
 
-.album-cover {
-  width: 200px;
-  height: 200px;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-}
-
-.album-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.album-details {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.album-meta {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.album-type {
-  background: rgba(255, 255, 255, 0.8);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.album-artist {
-  color: #666;
-  font-size: 14px;
-}
-
-.album-title {
+.library-title {
   font-size: 48px;
   font-weight: bold;
-  margin: 8px 0 16px 0;
-  color: #333;
+  margin: 0 0 8px 0;
+  color: white;
 }
 
-.album-stats {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-  color: #666;
+.library-subtitle {
+  font-size: 18px;
+  margin: 0 0 24px 0;
+  opacity: 0.9;
 }
 
-.album-actions {
+.library-actions {
   display: flex;
   gap: 12px;
+  justify-content: center;
 }
 
 /* 歌曲列表样式 */
@@ -559,7 +517,7 @@ const handleLogout = () => {
 
 .song-list-header {
   display: grid;
-  grid-template-columns: 60px 1fr 200px 80px 60px;
+  grid-template-columns: 60px 2fr 1fr 1fr 80px 60px;
   padding: 12px 16px;
   background: #fafafa;
   border-bottom: 1px solid #e8e8e8;
@@ -571,7 +529,7 @@ const handleLogout = () => {
 
 .song-item {
   display: grid;
-  grid-template-columns: 60px 1fr 200px 80px 60px;
+  grid-template-columns: 60px 2fr 1fr 1fr 80px 60px;
   padding: 12px 16px;
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
@@ -603,7 +561,28 @@ const handleLogout = () => {
   font-weight: 500;
 }
 
+.song-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.song-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.song-genre {
+  font-size: 12px;
+  color: #999;
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 10px;
+  width: fit-content;
+}
+
 .song-artist,
+.song-album,
 .song-duration {
   display: flex;
   align-items: center;
@@ -614,5 +593,42 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 加载更多按钮样式 */
+.load-more-section {
+  padding: 24px;
+  text-align: center;
+  background: white;
+  border-radius: 0 0 8px 8px;
+}
+
+/* 空状态样式 */
+.empty-state {
+  padding: 48px 24px;
+  text-align: center;
+  background: white;
+  border-radius: 0 0 8px 8px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .song-list-header,
+  .song-item {
+    grid-template-columns: 40px 2fr 1fr 60px 40px;
+  }
+  
+  .song-album {
+    display: none;
+  }
+  
+  .library-title {
+    font-size: 32px;
+  }
+  
+  .library-actions {
+    flex-direction: column;
+    align-items: center;
+  }
 }
 </style>
