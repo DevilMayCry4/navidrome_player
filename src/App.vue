@@ -13,28 +13,23 @@ import MusicPlayer from './components/MusicPlayer.vue'
 </script>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html, body {
+html, body, #app {
   height: 100%;
+  width: 100%;
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background-color: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 #app {
-  min-height: 100vh;
-  height: 100%;
-  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 全局样式覆盖 */

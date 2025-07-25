@@ -405,7 +405,7 @@ const handleLogout = () => {
 
 /* 侧边栏样式 */
 .sidebar {
-  width: 240px;
+  width: 200px;  /* 修改此处 */
   height: 100vh;
   background: white;
   border-right: 1px solid #e8e8e8;
@@ -454,7 +454,8 @@ const handleLogout = () => {
   flex: 1;
   height: 100vh;
   overflow-y: auto;
-  margin-left: 240px;
+  margin-left: 200px;
+  padding: 0 10px;  /* 添加左右边距 */
   display: flex;
   flex-direction: column;
 }
